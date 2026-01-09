@@ -1,11 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux"; // If you use Redux, otherwise ignore
+import { useNavigate, useParams } from "react-router-dom"; // useParams grabs the ID from URL
 import { toast } from "react-toastify";
-import { useNavigate } from "react-router-dom";
-import {
-	formatCurrency,
-	validateProductForm,
-} from "../utils/productValidation";
-import productService from "../services/productService";
 import {
 	FaTag,
 	FaBarcode,
@@ -14,12 +10,21 @@ import {
 	FaDollarSign,
 	FaAlignLeft,
 	FaSave,
+	FaArrowLeft,
 } from "react-icons/fa";
+import productService from "../services/productService";
+import {
+	formatCurrency,
+	validateProductForm,
+} from "../utils/productValidation";
 
-const AddProduct = () => {
+const EditProduct = () => {
+	const { id } = useParams(); // Get ID from the URL (e.g., /edit-product/123)
 	const navigate = useNavigate();
+
 	const [isLoading, setIsLoading] = useState(false);
-	const [formData, setFormData] = useState({
+	// Initial state is empty, will be filled by useEffect
+	const [product, setProduct] = useState({
 		name: "",
 		sku: "",
 		category: "",
@@ -28,54 +33,88 @@ const AddProduct = () => {
 		description: "",
 	});
 
-	const handleChange = (e) =>
-		setFormData({ ...formData, [e.target.name]: e.target.value });
+	// --- 1. FETCH DATA ON LOAD ---
+	useEffect(() => {
+		const getProductData = async () => {
+			setIsLoading(true);
+			try {
+				const data = await productService.getProduct(id);
+				// Pre-fill the form with fetched data
+				setProduct({
+					name: data.name,
+					sku: data.sku,
+					category: data.category,
+					quantity: data.quantity,
+					price: data.price,
+					description: data.description,
+				});
+			} catch (error) {
+				toast.error("Could not load product details.");
+				console.error(error);
+			} finally {
+				setIsLoading(false);
+			}
+		};
+		getProductData();
+	}, [id]);
 
-	const handleSubmit = async (e) => {
+	const handleChange = (e) => {
+		setProduct({ ...product, [e.target.name]: e.target.value });
+	};
+
+	// --- 2. HANDLE UPDATE ---
+	const handleUpdate = async (e) => {
 		e.preventDefault();
-		const validation = validateProductForm(formData);
+		const validation = validateProductForm(product);
 		if (!validation.isValid) return toast.error(validation.error);
 
 		setIsLoading(true);
 		try {
-			await productService.createProduct(formData);
-			toast.success("Inventory updated successfully!");
+			await productService.updateProduct(id, product);
+			toast.success("Product updated successfully!");
 			navigate("/inventory");
 		} catch (error) {
-			toast.error("Error adding product");
+			toast.error("Failed to update product");
+			console.error(error);
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	const totalValue = Number(formData.quantity) * Number(formData.price);
+	const totalValue = Number(product.quantity) * Number(product.price);
 
-	// --- SPICED UP STYLES ---
+	// Styling Constants (Same as AddProduct)
 	const labelClass = "block text-sm font-bold text-gray-700 mb-2";
 	const inputWrapperClass = "relative flex items-center";
-	const iconClass = "absolute left-4 text-gray-400 z-10 pointer-events-none"; // Icons sit inside input
+	const iconClass = "absolute left-4 text-gray-400 z-10 pointer-events-none";
 	const inputClass =
 		"w-full pl-11 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all duration-300 shadow-sm hover:border-gray-300";
 
 	return (
 		<div className="max-w-4xl mx-auto mt-6">
-			{/* Header Section */}
-			<div className="mb-6 flex items-center justify-between">
+			{/* Header */}
+			<div className="mb-6 flex items-center gap-4">
+				<button
+					onClick={() => navigate("/inventory")}
+					className="p-2 bg-white rounded-full text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition shadow-sm"
+				>
+					<FaArrowLeft />
+				</button>
 				<div>
 					<h2 className="text-3xl font-extrabold text-gray-800">
-						Add New Product
+						Edit Product
 					</h2>
 					<p className="text-gray-500 mt-1">
-						Create a new inventory record
+						Update inventory details
 					</p>
 				</div>
 			</div>
 
 			<div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 relative overflow-hidden">
-				{/* Decorative Top Border */}
-				<div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+				{/* Decorative Top Border (Orange/Red gradient to distinguish from Add Page) */}
+				<div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-500"></div>
 
-				<form onSubmit={handleSubmit} className="space-y-8 mt-4">
+				<form onSubmit={handleUpdate} className="space-y-8 mt-4">
 					{/* Row 1: Name */}
 					<div>
 						<label className={labelClass}>Product Name</label>
@@ -85,9 +124,8 @@ const AddProduct = () => {
 								type="text"
 								name="name"
 								className={inputClass}
-								value={formData.name}
+								value={product.name}
 								onChange={handleChange}
-								placeholder="e.g. Ultra-Wide Monitor"
 							/>
 						</div>
 					</div>
@@ -104,9 +142,9 @@ const AddProduct = () => {
 									type="text"
 									name="sku"
 									className={inputClass}
-									value={formData.sku}
+									value={product.sku}
 									onChange={handleChange}
-									placeholder="MON-001"
+									disabled // Usually SKU should not be changed, remove 'disabled' if you want to allow it
 								/>
 							</div>
 						</div>
@@ -118,9 +156,8 @@ const AddProduct = () => {
 									type="text"
 									name="category"
 									className={inputClass}
-									value={formData.category}
+									value={product.category}
 									onChange={handleChange}
-									placeholder="Electronics"
 								/>
 							</div>
 						</div>
@@ -129,36 +166,26 @@ const AddProduct = () => {
 					{/* Row 3: Qty & Price */}
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 						<div>
-							<label className={labelClass}>
-								Quantity in Stock
-							</label>
+							<label className={labelClass}>Quantity</label>
 							<div className={inputWrapperClass}>
 								<FaBoxes className={iconClass} />
 								<input
 									type="number"
 									name="quantity"
 									className={inputClass}
-									value={formData.quantity}
+									value={product.quantity}
 									onChange={handleChange}
-									max="99999999"
-									onInput={(e) => {
-										if (e.target.value.length > 8)
-											e.target.value =
-												e.target.value.slice(0, 8);
-									}}
-									placeholder="0"
 								/>
 							</div>
 						</div>
 						<div>
 							<div className="flex justify-between items-center mb-2">
 								<label className="text-sm font-bold text-gray-700">
-									Price per Unit
+									Price
 								</label>
-								{/* Live Value Badge */}
-								{formData.quantity && formData.price && (
-									<span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-3 py-1 rounded-full animate-pulse">
-										Total: {formatCurrency(totalValue)}
+								{product.quantity && product.price && (
+									<span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
+										Value: {formatCurrency(totalValue)}
 									</span>
 								)}
 							</div>
@@ -168,15 +195,8 @@ const AddProduct = () => {
 									type="number"
 									name="price"
 									className={inputClass}
-									value={formData.price}
+									value={product.price}
 									onChange={handleChange}
-									max="99999999"
-									onInput={(e) => {
-										if (e.target.value.length > 8)
-											e.target.value =
-												e.target.value.slice(0, 8);
-									}}
-									placeholder="0.00"
 								/>
 							</div>
 						</div>
@@ -184,18 +204,15 @@ const AddProduct = () => {
 
 					{/* Row 4: Description */}
 					<div>
-						<label className={labelClass}>
-							Product Description
-						</label>
+						<label className={labelClass}>Description</label>
 						<div className="relative">
 							<FaAlignLeft className="absolute left-4 top-4 text-gray-400 z-10" />
 							<textarea
 								name="description"
 								rows="4"
 								className={`${inputClass} pt-4`}
-								value={formData.description}
+								value={product.description}
 								onChange={handleChange}
-								placeholder="Add details about the product..."
 							></textarea>
 						</div>
 					</div>
@@ -213,17 +230,18 @@ const AddProduct = () => {
 						<button
 							type="submit"
 							disabled={isLoading}
-							className={`w-2/3 py-4 rounded-xl font-bold text-lg text-white shadow-lg shadow-blue-500/30 transform transition-all duration-300 hover:scale-[1.02] active:scale-95 flex justify-center items-center gap-2 ${
+							className={`w-2/3 py-4 rounded-xl font-bold text-lg text-white shadow-lg shadow-orange-500/30 transform transition-all duration-300 hover:scale-[1.02] active:scale-95 flex justify-center items-center gap-2 ${
 								isLoading
-									? "bg-blue-400 cursor-not-allowed"
-									: "bg-gradient-to-r from-blue-600 to-indigo-600 hover:to-indigo-700"
+									? "bg-orange-300 cursor-not-allowed"
+									: "bg-gradient-to-r from-orange-500 to-pink-600 hover:to-pink-700"
 							}`}
 						>
 							{isLoading ? (
-								<div className="h-6 w-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+								"Saving..."
 							) : (
 								<>
-									<FaSave className="text-xl" /> Save Product
+									<FaSave className="text-xl" /> Update
+									Product
 								</>
 							)}
 						</button>
@@ -234,4 +252,4 @@ const AddProduct = () => {
 	);
 };
 
-export default AddProduct;
+export default EditProduct;

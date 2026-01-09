@@ -1,6 +1,6 @@
 
 
-import Product from "../models/Product.js";
+import Product from "../../models/Product.js";
 
 // @access  Public (for now)
 export const createProduct = async (req, res) => {

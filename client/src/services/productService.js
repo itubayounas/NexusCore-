@@ -1,24 +1,43 @@
 import axios from "axios";
 
-// Define the base URL for the API
 const API_URL = "http://localhost:5000/api/products";
 
-// Function to Create a new product
+// --- Create New Product ---
 const createProduct = async (formData) => {
 	const response = await axios.post(API_URL, formData);
 	return response.data;
 };
 
-// Function to Get all products (We will use this later)
+// --- Get All Products ---
 const getProducts = async () => {
 	const response = await axios.get(API_URL);
 	return response.data;
 };
 
-// Export all functions as a single object
+// --- Get Single Product (for Edit) ---
+const getProduct = async (id) => {
+	const response = await axios.get(`${API_URL}/${id}`);
+	return response.data;
+};
+
+// --- Delete Product ---
+const deleteProduct = async (id) => {
+	const response = await axios.delete(`${API_URL}/${id}`);
+	return response.data;
+};
+
+// --- Update Product ---
+const updateProduct = async (id, formData) => {
+	const response = await axios.patch(`${API_URL}/${id}`, formData);
+	return response.data;
+};
+
 const productService = {
 	createProduct,
 	getProducts,
+	getProduct,
+	deleteProduct,
+	updateProduct,
 };
 
 export default productService;
