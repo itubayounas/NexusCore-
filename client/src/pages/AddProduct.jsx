@@ -1,25 +1,16 @@
 import React, { useState } from "react";
+import { useRedirectLoggedOutUser } from "../hook/useRedirectLoggedOutUser";
+import axios from "axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-import {
-	formatCurrency,
-	validateProductForm,
-} from "../utils/productValidation";
-import productService from "../services/productService";
-import {
-	FaTag,
-	FaBarcode,
-	FaLayerGroup,
-	FaBoxes,
-	FaDollarSign,
-	FaAlignLeft,
-	FaSave,
-} from "react-icons/fa";
+import { motion } from "framer-motion";
+import { FaSpinner, FaSyncAlt } from "react-icons/fa";
 
 const AddProduct = () => {
+	useRedirectLoggedOutUser("/login");
 	const navigate = useNavigate();
-	const [isLoading, setIsLoading] = useState(false);
-	const [formData, setFormData] = useState({
+
+	const [product, setProduct] = useState({
 		name: "",
 		sku: "",
 		category: "",
@@ -28,208 +19,184 @@ const AddProduct = () => {
 		description: "",
 	});
 
-	const handleChange = (e) =>
-		setFormData({ ...formData, [e.target.name]: e.target.value });
+	const [isLoading, setIsLoading] = useState(false);
+	const { name, sku, category, quantity, price, description } = product;
 
-	const handleSubmit = async (e) => {
+	const handleInputChange = (e) => {
+		const { name, value } = e.target;
+		// Validation logic
+		if (name === "price" || name === "quantity") {
+			if (value < 0) return;
+			if (value.length > 8) return;
+		}
+		setProduct({ ...product, [name]: value });
+	};
+
+	const generateSKU = () => {
+		const categoryPrefix = category
+			? category.slice(0, 3).toUpperCase()
+			: "SKU";
+		const numberPart = Date.now().toString().slice(-6);
+		const newSKU = `${categoryPrefix}-${numberPart}`;
+
+		setProduct({ ...product, sku: newSKU });
+		toast.info("SKU Auto-Generated!");
+	};
+
+	const saveProduct = async (e) => {
 		e.preventDefault();
-		const validation = validateProductForm(formData);
-		if (!validation.isValid) return toast.error(validation.error);
-
 		setIsLoading(true);
-		try {
-			await productService.createProduct(formData);
-			toast.success("Inventory updated successfully!");
-			navigate("/inventory");
-		} catch (error) {
-			toast.error("Error adding product");
-		} finally {
+
+		if (!name || !category || !quantity || !price || !description || !sku) {
 			setIsLoading(false);
+			return toast.error("Please fill in all fields");
+		}
+
+		try {
+			await axios.post("/api/products", product);
+			toast.success("Product Added Successfully!");
+			navigate("/inventory");
+			setIsLoading(false);
+		} catch (error) {
+			setIsLoading(false);
+			toast.error(error.response?.data?.message || error.message);
 		}
 	};
 
-	const totalValue = Number(formData.quantity) * Number(formData.price);
-
-	// --- SPICED UP STYLES ---
-	const labelClass = "block text-sm font-bold text-gray-700 mb-2";
-	const inputWrapperClass = "relative flex items-center";
-	const iconClass = "absolute left-4 text-gray-400 z-10 pointer-events-none"; // Icons sit inside input
-	const inputClass =
-		"w-full pl-11 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all duration-300 shadow-sm hover:border-gray-300";
-
 	return (
-		<div className="max-w-4xl mx-auto mt-6">
-			{/* Header Section */}
-			<div className="mb-6 flex items-center justify-between">
-				<div>
-					<h2 className="text-3xl font-extrabold text-gray-800">
-						Add New Product
-					</h2>
-					<p className="text-gray-500 mt-1">
-						Create a new inventory record
-					</p>
-				</div>
-			</div>
+		<div className="flex justify-center items-center min-h-[80vh] text-white p-4">
+			<motion.div
+				initial={{ opacity: 0, y: 20 }}
+				animate={{ opacity: 1, y: 0 }}
+				// UPDATED: Reduced padding on mobile (p-5), larger on desktop (md:p-10)
+				className="glass w-full max-w-3xl p-5 md:p-10 shadow-2xl"
+			>
+				<h2 className="text-3xl font-bold mb-6 text-center text-white border-b border-gray-600 pb-4">
+					Add New Product
+				</h2>
 
-			<div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 relative overflow-hidden">
-				{/* Decorative Top Border */}
-				<div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
-
-				<form onSubmit={handleSubmit} className="space-y-8 mt-4">
-					{/* Row 1: Name */}
-					<div>
-						<label className={labelClass}>Product Name</label>
-						<div className={inputWrapperClass}>
-							<FaTag className={iconClass} />
+				<form onSubmit={saveProduct} className="space-y-6">
+					{/* UPDATED: Grid layout. 1 col on mobile, 2 cols on small screens+ */}
+					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+						{/* Name (Spans 2 columns on sm+) */}
+						<div className="sm:col-span-2">
+							<label className="block text-sm font-medium text-gray-300 mb-2">
+								Product Name
+							</label>
 							<input
 								type="text"
 								name="name"
-								className={inputClass}
-								value={formData.name}
-								onChange={handleChange}
-								placeholder="e.g. Ultra-Wide Monitor"
+								value={name}
+								onChange={handleInputChange}
+								placeholder="e.g. Nike Air Jordan"
+								className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-brand-500 focus:outline-none transition"
 							/>
 						</div>
-					</div>
 
-					{/* Row 2: SKU & Category */}
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+						{/* Category */}
 						<div>
-							<label className={labelClass}>
-								SKU (Stock Keeping Unit)
+							<label className="block text-sm font-medium text-gray-300 mb-2">
+								Category
 							</label>
-							<div className={inputWrapperClass}>
-								<FaBarcode className={iconClass} />
+							<input
+								type="text"
+								name="category"
+								value={category}
+								onChange={handleInputChange}
+								placeholder="e.g. Shoes"
+								className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-brand-500 focus:outline-none transition"
+							/>
+						</div>
+
+						{/* SKU */}
+						<div>
+							<label className="block text-sm font-medium text-gray-300 mb-2">
+								SKU (Barcode)
+							</label>
+							<div className="flex items-center gap-2">
 								<input
 									type="text"
 									name="sku"
-									className={inputClass}
-									value={formData.sku}
-									onChange={handleChange}
-									placeholder="MON-001"
+									value={sku}
+									onChange={handleInputChange}
+									placeholder="Scan or Type SKU"
+									className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-brand-500 focus:outline-none transition font-mono uppercase"
 								/>
+								<button
+									type="button"
+									onClick={generateSKU}
+									className="bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition"
+									title="Auto Generate SKU"
+								>
+									<FaSyncAlt />
+								</button>
 							</div>
 						</div>
-						<div>
-							<label className={labelClass}>Category</label>
-							<div className={inputWrapperClass}>
-								<FaLayerGroup className={iconClass} />
-								<input
-									type="text"
-									name="category"
-									className={inputClass}
-									value={formData.category}
-									onChange={handleChange}
-									placeholder="Electronics"
-								/>
-							</div>
-						</div>
-					</div>
 
-					{/* Row 3: Qty & Price */}
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+						{/* Price */}
 						<div>
-							<label className={labelClass}>
-								Quantity in Stock
+							<label className="block text-sm font-medium text-gray-300 mb-2">
+								Price ($)
 							</label>
-							<div className={inputWrapperClass}>
-								<FaBoxes className={iconClass} />
-								<input
-									type="number"
-									name="quantity"
-									className={inputClass}
-									value={formData.quantity}
-									onChange={handleChange}
-									max="99999999"
-									onInput={(e) => {
-										if (e.target.value.length > 8)
-											e.target.value =
-												e.target.value.slice(0, 8);
-									}}
-									placeholder="0"
-								/>
-							</div>
+							<input
+								type="number"
+								name="price"
+								value={price}
+								onChange={handleInputChange}
+								min="0"
+								placeholder="0.00"
+								className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-brand-500 focus:outline-none transition"
+							/>
 						</div>
-						<div>
-							<div className="flex justify-between items-center mb-2">
-								<label className="text-sm font-bold text-gray-700">
-									Price per Unit
-								</label>
-								{/* Live Value Badge */}
-								{formData.quantity && formData.price && (
-									<span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-3 py-1 rounded-full animate-pulse">
-										Total: {formatCurrency(totalValue)}
-									</span>
-								)}
-							</div>
-							<div className={inputWrapperClass}>
-								<FaDollarSign className={iconClass} />
-								<input
-									type="number"
-									name="price"
-									className={inputClass}
-									value={formData.price}
-									onChange={handleChange}
-									max="99999999"
-									onInput={(e) => {
-										if (e.target.value.length > 8)
-											e.target.value =
-												e.target.value.slice(0, 8);
-									}}
-									placeholder="0.00"
-								/>
-							</div>
-						</div>
-					</div>
 
-					{/* Row 4: Description */}
-					<div>
-						<label className={labelClass}>
-							Product Description
-						</label>
-						<div className="relative">
-							<FaAlignLeft className="absolute left-4 top-4 text-gray-400 z-10" />
+						{/* Quantity */}
+						<div>
+							<label className="block text-sm font-medium text-gray-300 mb-2">
+								Quantity
+							</label>
+							<input
+								type="number"
+								name="quantity"
+								value={quantity}
+								onChange={handleInputChange}
+								min="0"
+								placeholder="0"
+								className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-brand-500 focus:outline-none transition"
+							/>
+						</div>
+
+						{/* Description (Spans 2 columns on sm+) */}
+						<div className="sm:col-span-2">
+							<label className="block text-sm font-medium text-gray-300 mb-2">
+								Description
+							</label>
 							<textarea
 								name="description"
+								value={description}
+								onChange={handleInputChange}
 								rows="4"
-								className={`${inputClass} pt-4`}
-								value={formData.description}
-								onChange={handleChange}
-								placeholder="Add details about the product..."
+								placeholder="Description..."
+								className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-brand-500 focus:outline-none transition resize-none"
 							></textarea>
 						</div>
 					</div>
 
-					{/* Row 5: Action Buttons */}
-					<div className="flex items-center gap-4 pt-4 border-t border-gray-100">
-						<button
-							type="button"
-							onClick={() => navigate("/inventory")}
-							className="w-1/3 py-4 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
-						>
-							Cancel
-						</button>
-
+					{/* Submit Button */}
+					<div className="mt-8">
 						<button
 							type="submit"
 							disabled={isLoading}
-							className={`w-2/3 py-4 rounded-xl font-bold text-lg text-white shadow-lg shadow-blue-500/30 transform transition-all duration-300 hover:scale-[1.02] active:scale-95 flex justify-center items-center gap-2 ${
-								isLoading
-									? "bg-blue-400 cursor-not-allowed"
-									: "bg-gradient-to-r from-blue-600 to-indigo-600 hover:to-indigo-700"
-							}`}
+							className="w-full bg-brand-600 hover:bg-brand-500 text-white font-bold py-4 rounded-xl shadow-lg transition flex justify-center items-center"
 						>
 							{isLoading ? (
-								<div className="h-6 w-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+								<FaSpinner className="animate-spin text-2xl" />
 							) : (
-								<>
-									<FaSave className="text-xl" /> Save Product
-								</>
+								"Save Product"
 							)}
 						</button>
 					</div>
 				</form>
-			</div>
+			</motion.div>
 		</div>
 	);
 };

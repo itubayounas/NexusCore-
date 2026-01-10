@@ -1,10 +1,14 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.jsx'
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import axios from "axios"; // <--- Import Axios
+import "./index.css";
+import App from "./App.jsx";
 
-createRoot(document.getElementById('root')).render(
-  // <StrictMode>
-    <App />
-  // </StrictMode>,
-)
+// Enable cookies for every request
+axios.defaults.withCredentials = true;
+
+createRoot(document.getElementById("root")).render(
+	// <StrictMode>
+	<App />
+	// </StrictMode>,
+);

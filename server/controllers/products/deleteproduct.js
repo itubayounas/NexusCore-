@@ -1,18 +1,22 @@
+import asyncHandler from "express-async-handler";
 import Product from "../../models/Product.js";
 
+export const deleteProduct = asyncHandler(async (req, res) => {
+	const product = await Product.findById(req.params.id);
 
-export const deleteProduct = async (req, res) => {
-	try {
-		const { id } = req.params;
-		const product = await Product.findByIdAndDelete(id);
-
-		if (!product) {
-			res.status(404);
-			throw new Error("Product not found");
-		}
-
-		res.status(200).json({ message: "Product deleted successfully" });
-	} catch (error) {
-		res.status(500).json({ message: error.message });
+	// 1. Check if product exists
+	if (!product) {
+		res.status(404);
+		throw new Error("Product not found");
 	}
-};
+
+	// 2. Security Check: Ownership
+	if (product.user.toString() !== req.user.id) {
+		res.status(401);
+		throw new Error("User not authorized to delete this product");
+	}
+
+	// 3. Delete
+	await product.deleteOne(); // Use deleteOne() instead of remove()
+	res.status(200).json({ message: "Product deleted successfully" });
+});

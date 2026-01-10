@@ -1,175 +1,294 @@
 import React, { useEffect, useState } from "react";
+import { useRedirectLoggedOutUser } from "../hook/useRedirectLoggedOutUser";
+import axios from "axios";
+import { motion } from "framer-motion";
+import {
+	FaUser,
+	FaBoxOpen,
+	FaDollarSign,
+	FaClipboardList,
+} from "react-icons/fa";
 import { Link } from "react-router-dom";
 import {
-	FaDollarSign,
-	FaShoppingCart,
-	FaExclamationTriangle,
-	FaBoxOpen,
-	FaArrowRight,
-} from "react-icons/fa";
-import productService from "../services/productService";
-import { formatCurrency } from "../utils/productValidation";
+	Chart as ChartJS,
+	CategoryScale,
+	LinearScale,
+	BarElement,
+	Title,
+	Tooltip,
+	Legend,
+	ArcElement,
+} from "chart.js";
+import { Bar, Doughnut } from "react-chartjs-2";
+
+// 1. Register ChartJS Components
+ChartJS.register(
+	CategoryScale,
+	LinearScale,
+	BarElement,
+	Title,
+	Tooltip,
+	Legend,
+	ArcElement
+);
+
+// Helper to add commas
+const formatNumber = (x) => {
+	return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
 
 const Dashboard = () => {
+	useRedirectLoggedOutUser("/login");
+
+	const [user, setUser] = useState(null);
 	const [products, setProducts] = useState([]);
-	const [isLoading, setIsLoading] = useState(true);
 
-	// --- 1. Calculate Live Stats ---
-	// Total money value of all items in stock
-	const totalStoreValue = products.reduce(
-		(acc, item) => acc + Number(item.price) * Number(item.quantity),
-		0
-	);
+	// Stats State
+	const [totalValue, setTotalValue] = useState(0);
+	const [outOfStock, setOutOfStock] = useState(0);
+	const [categoryCount, setCategoryCount] = useState(0);
 
-	// Count of items with 0 quantity
-	const outOfStock = products.filter(
-		(item) => Number(item.quantity) === 0
-	).length;
-
-	// Count of items with less than 5 quantity (but not 0)
-	const lowStock = products.filter(
-		(item) => Number(item.quantity) > 0 && Number(item.quantity) < 5
-	).length;
-
-	// Count of unique categories
-	const totalCategories = [...new Set(products.map((p) => p.category))]
-		.length;
+	// Chart Data State
+	const [categoryChartData, setCategoryChartData] = useState(null);
+	const [stockChartData, setStockChartData] = useState(null);
 
 	useEffect(() => {
-		const fetchStats = async () => {
+		async function fetchData() {
 			try {
-				const data = await productService.getProducts();
-				setProducts(data);
+				const userResponse = await axios.get("/api/users/getuser");
+				setUser(userResponse.data);
+
+				const productResponse = await axios.get("/api/products");
+				setProducts(productResponse.data);
 			} catch (error) {
-				console.error("Failed to load stats");
-			} finally {
-				setIsLoading(false);
+				console.log("Error fetching data");
 			}
-		};
-		fetchStats();
+		}
+		fetchData();
 	}, []);
 
-	// --- 2. Reusable Stat Card Component ---
-	const StatCard = ({ icon, label, value, color, linkText, linkTo }) => (
-		<div className="bg-white p-6 rounded-2xl shadow-md border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-			<div className="flex items-center justify-between mb-4">
-				<div
-					className={`p-4 rounded-full ${color} text-white text-2xl shadow-lg`}
-				>
-					{icon}
-				</div>
-				<div className="text-right">
-					<p className="text-gray-500 text-sm font-medium uppercase tracking-wider">
-						{label}
-					</p>
-					<h3 className="text-3xl font-extrabold text-gray-800 mt-1">
-						{value}
-					</h3>
-				</div>
-			</div>
-			<div className="border-t border-gray-100 pt-4">
-				<Link
-					to={linkTo}
-					className="text-sm font-bold text-blue-600 hover:text-blue-800 flex items-center gap-2 group"
-				>
-					{linkText}{" "}
-					<FaArrowRight className="group-hover:translate-x-1 transition-transform" />
-				</Link>
-			</div>
-		</div>
-	);
+	// --- CALCULATION ENGINE ---
+	useEffect(() => {
+		if (products.length > 0) {
+			// 1. Basic Stats
+			const value = products.reduce(
+				(acc, item) => acc + Number(item.price) * Number(item.quantity),
+				0
+			);
+			setTotalValue(value);
+
+			const outOfStockItems = products.filter(
+				(item) => Number(item.quantity) === 0
+			);
+			setOutOfStock(outOfStockItems.length);
+
+			const allCategories = products.map((item) => item.category);
+			const uniqueCategories = [...new Set(allCategories)];
+			setCategoryCount(uniqueCategories.length);
+
+			// 2. Prepare Chart Data
+
+			// --- BAR CHART: Products per Category ---
+			// Count how many items in each category
+			const categoryCounts = {};
+			products.forEach((item) => {
+				const cat = item.category;
+				categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+			});
+
+			setCategoryChartData({
+				labels: Object.keys(categoryCounts), // ["Electronics", "Shoes", ...]
+				datasets: [
+					{
+						label: "Product Count",
+						data: Object.values(categoryCounts), // [5, 2, ...]
+						backgroundColor: "rgba(14, 165, 233, 0.7)", // Brand-500
+						borderColor: "#0ea5e9",
+						borderWidth: 1,
+						borderRadius: 5,
+					},
+				],
+			});
+
+			// --- DOUGHNUT CHART: In Stock vs Out of Stock ---
+			const inStockCount = products.length - outOfStockItems.length;
+			setStockChartData({
+				labels: ["In Stock", "Out of Stock"],
+				datasets: [
+					{
+						data: [inStockCount, outOfStockItems.length],
+						backgroundColor: [
+							"rgba(34, 197, 94, 0.7)", // Green
+							"rgba(239, 68, 68, 0.7)", // Red
+						],
+						borderColor: ["#22c55e", "#ef4444"],
+						borderWidth: 1,
+					},
+				],
+			});
+		}
+	}, [products]);
+
+	// Animations
+	const containerVariants = {
+		hidden: { opacity: 0 },
+		visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
+	};
+
+	const itemVariants = {
+		hidden: { y: 20, opacity: 0 },
+		visible: { y: 0, opacity: 1 },
+	};
 
 	return (
-		<div className="max-w-7xl mx-auto">
-			{/* Header */}
-			<div className="mb-10">
-				<h2 className="text-4xl font-extrabold text-gray-800">
-					Dashboard Overview
-				</h2>
-				<p className="text-gray-500 mt-2 text-lg">
-					Welcome back. Here is your live inventory status.
-				</p>
-			</div>
+		<div className="text-white pb-10">
+			<motion.div
+				className="p-4"
+				variants={containerVariants}
+				initial="hidden"
+				animate="visible"
+			>
+				{/* Welcome Banner */}
+				<motion.div
+					variants={itemVariants}
+					className="bg-brand-600 text-white p-8 rounded-xl shadow-lg mb-8 shadow-brand-500/30"
+				>
+					<h2 className="text-3xl font-bold mb-2">
+						Welcome back, {user ? user.name : "Guest"}! 👋
+					</h2>
+					<p className="opacity-90">
+						Here is your real-time inventory overview.
+					</p>
+				</motion.div>
 
-			{isLoading ? (
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 animate-pulse">
-					{[1, 2, 3, 4].map((i) => (
-						<div
-							key={i}
-							className="h-40 bg-gray-200 rounded-2xl"
-						></div>
-					))}
-				</div>
-			) : (
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-					{/* Card 1: Total Value (Live) */}
-					<StatCard
-						icon={<FaDollarSign />}
-						label="Total Asset Value"
-						value={formatCurrency(totalStoreValue)}
-						color="bg-emerald-500"
-						linkText="View Financials"
-						linkTo="/inventory"
-					/>
-
-					{/* Card 2: Total Products (Live) */}
-					<StatCard
-						icon={<FaShoppingCart />}
-						label="Total Products"
+				{/* Stats Grid */}
+				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+					<DashboardCard
+						icon={<FaBoxOpen size={30} className="text-white" />}
+						title="Total Products"
 						value={products.length}
-						color="bg-blue-500"
-						linkText="Manage Inventory"
-						linkTo="/inventory"
+						color="bg-purple-600"
+						variants={itemVariants}
 					/>
-
-					{/* Card 3: Out of Stock (Live) */}
-					<StatCard
-						icon={<FaExclamationTriangle />}
-						label="Out of Stock"
+					<DashboardCard
+						icon={<FaDollarSign size={30} className="text-white" />}
+						title="Total Value"
+						value={`$${formatNumber(totalValue.toFixed(2))}`}
+						color="bg-green-600"
+						variants={itemVariants}
+					/>
+					<DashboardCard
+						icon={
+							<FaClipboardList size={30} className="text-white" />
+						}
+						title="Out of Stock"
 						value={outOfStock}
 						color="bg-red-500"
-						linkText="Restock Now"
-						linkTo="/inventory"
+						variants={itemVariants}
 					/>
-
-					{/* Card 4: Categories (Live) */}
-					<StatCard
-						icon={<FaBoxOpen />}
-						label="Categories"
-						value={totalCategories}
-						color="bg-purple-500"
-						linkText="View Categories"
-						linkTo="/inventory"
+					<DashboardCard
+						icon={<FaUser size={30} className="text-white" />}
+						title="Categories"
+						value={categoryCount}
+						color="bg-orange-500"
+						variants={itemVariants}
 					/>
 				</div>
-			)}
 
-			{/* --- Quick Action Buttons --- */}
-			<div className="mt-12 bg-white rounded-2xl shadow-lg border border-gray-100 p-8 flex flex-col md:flex-row items-center justify-between gap-4">
-				<div>
-					<h3 className="text-xl font-bold text-gray-800">
-						Quick Actions
-					</h3>
-					<p className="text-gray-500">
-						Manage your stock immediately
-					</p>
-				</div>
-				<div className="flex gap-4 w-full md:w-auto">
-					<Link
-						to="/add-product"
-						className="flex-1 md:flex-none text-center px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition shadow-md"
-					>
-						+ Add New Stock
-					</Link>
-					<Link
-						to="/inventory"
-						className="flex-1 md:flex-none text-center px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition"
-					>
-						View Full List
-					</Link>
-				</div>
-			</div>
+				{/* --- CHARTS SECTION --- */}
+				{products.length > 0 && (
+					<div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+						{/* Bar Chart */}
+						<motion.div
+							variants={itemVariants}
+							className="glass p-6 rounded-xl border border-white/10 shadow-xl"
+						>
+							<h3 className="text-xl font-bold mb-4">
+								Inventory by Category
+							</h3>
+							{categoryChartData && (
+								<Bar
+									options={options}
+									data={categoryChartData}
+								/>
+							)}
+						</motion.div>
+
+						{/* Doughnut Chart */}
+						<motion.div
+							variants={itemVariants}
+							className="glass p-6 rounded-xl border border-white/10 shadow-xl flex flex-col items-center"
+						>
+							<h3 className="text-xl font-bold mb-4">
+								Availability Status
+							</h3>
+							<div className="w-full max-w-[300px]">
+								{stockChartData && (
+									<Doughnut data={stockChartData} />
+								)}
+							</div>
+						</motion.div>
+					</div>
+				)}
+
+				{/* Quick Actions */}
+				<motion.div variants={itemVariants} className="mt-10">
+					<h3 className="text-xl font-bold mb-4">Quick Actions</h3>
+					<div className="flex gap-4">
+						<Link to="/add-product">
+							<button className="bg-brand-600 px-6 py-3 rounded-lg hover:bg-brand-500 transition font-bold shadow-lg shadow-brand-500/20">
+								+ Add New Product
+							</button>
+						</Link>
+					</div>
+				</motion.div>
+			</motion.div>
 		</div>
+	);
+};
+
+// Chart Config Options (Dark Mode Friendly)
+const options = {
+	responsive: true,
+	plugins: {
+		legend: {
+			position: "top",
+			labels: { color: "white" }, // White text for Legend
+		},
+		title: {
+			display: false,
+		},
+	},
+	scales: {
+		y: {
+			ticks: { color: "#cbd5e1" }, // Light gray text
+			grid: { color: "#334155" }, // Dark gray grid lines
+		},
+		x: {
+			ticks: { color: "#cbd5e1" },
+			grid: { display: false },
+		},
+	},
+};
+
+// Reusable Card Component
+const DashboardCard = ({ icon, title, value, color, variants }) => {
+	return (
+		<motion.div
+			variants={variants}
+			whileHover={{ scale: 1.05 }}
+			className={`p-6 rounded-xl shadow-lg text-white ${color} flex items-center justify-between cursor-pointer border border-white/10`}
+		>
+			<div>
+				<h3 className="text-sm font-medium opacity-80 uppercase tracking-wider">
+					{title}
+				</h3>
+				<p className="text-3xl font-bold mt-1">{value}</p>
+			</div>
+			<div className="bg-white/20 p-3 rounded-full backdrop-blur-sm">
+				{icon}
+			</div>
+		</motion.div>
 	);
 };
 

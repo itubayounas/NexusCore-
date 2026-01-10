@@ -1,11 +1,20 @@
 import express from "express";
 import dotenv from "dotenv";
+dotenv.config();
 import mongoose from "mongoose";
 import cors from "cors";
-import productRoutes from "./routes/productRoute.js"; // <--- NEW IMPORT
+import productRoutes from "./routes/productRoute.js";
+import userRoute from "./routes/userRoute.js";
+import path from "path";
+import { fileURLToPath } from "url"; // Needed for ES6 __dirname
+import cookieParser from "cookie-parser";
+import errorHandler from "./middleware/errorMiddleware.js";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// dotenv.config();
 const app = express();
+app.use(cookieParser());
 
 // --- MIDDLEWARE ---
 app.use(express.json());
@@ -23,14 +32,10 @@ const connectDB = async () => {
 };
 connectDB();
 
-// --- ROUTES ---
-app.get("/", (req, res) => {
-	res.send("API is running...");
-});
-
-// Use the Product Routes
-// This tells the server: "Any URL starting with /api/products go to the productRoutes file"
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/products", productRoutes);
+app.use("/api/users", userRoute);
+app.use(errorHandler);
 
 // --- START SERVER ---
 const PORT = process.env.PORT || 5000;

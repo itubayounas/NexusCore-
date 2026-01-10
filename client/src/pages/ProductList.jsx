@@ -1,289 +1,235 @@
 import React, { useEffect, useState } from "react";
+import { useRedirectLoggedOutUser } from "../hook/useRedirectLoggedOutUser";
+import axios from "axios";
+import { FaEdit, FaTrashAlt, FaEye, FaPlus, FaSearch } from "react-icons/fa";
 import { Link } from "react-router-dom";
-import {
-	FaEdit,
-	FaTrashAlt,
-	FaPlus,
-	FaSearch,
-	FaFilter,
-	FaSort,
-} from "react-icons/fa";
 import { toast } from "react-toastify";
-import productService from "../services/productService";
-import { formatCurrency } from "../utils/productValidation";
-
-
-const CustomConfirm = ({ closeToast, onConfirm }) => (
-	<div className="flex flex-col gap-3">
-		<h3 className="font-semibold text-gray-800 text-sm">
-			Are you sure you want to delete this item?
-		</h3>
-		<div className="flex justify-end gap-2">
-			<button
-				onClick={closeToast}
-				className="px-3 py-1 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition"
-			>
-				Cancel
-			</button>
-			<button
-				onClick={() => {
-					onConfirm();
-					closeToast();
-				}}
-				className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 shadow-sm transition"
-			>
-				Yes, Delete
-			</button>
-		</div>
-	</div>
-);
+import { motion } from "framer-motion";
+import Swal from "sweetalert2";
 
 const ProductList = () => {
-	const [products, setProducts] = useState([]);
-	const [isLoading, setIsLoading] = useState(true);
-	const [searchTerm, setSearchTerm] = useState("");
+	useRedirectLoggedOutUser("/login");
 
-	// Load Data
-	const loadProducts = async () => {
+	const [products, setProducts] = useState([]);
+	const [isLoading, setIsLoading] = useState(false);
+	const [search, setSearch] = useState(""); // 1. Search State
+
+	const getProducts = async () => {
 		setIsLoading(true);
 		try {
-			const data = await productService.getProducts();
+			const { data } = await axios.get("/api/products");
 			setProducts(data);
-		} catch (error) {
-			toast.error("Connection failed");
-		} finally {
 			setIsLoading(false);
+		} catch (error) {
+			setIsLoading(false);
+			toast.error(error.message);
 		}
 	};
 
 	useEffect(() => {
-		loadProducts();
+		getProducts();
 	}, []);
 
-	// --- DELETE LOGIC WITH CUSTOM TOAST ---
-	const handleDelete = (id) => {
-		toast(
-			({ closeToast }) => (
-				<CustomConfirm
-					closeToast={closeToast}
-					onConfirm={async () => {
-						try {
-							await productService.deleteProduct(id);
-							toast.success("Product deleted successfully");
-							loadProducts(); // Refresh the list
-						} catch (error) {
-							toast.error("Delete failed");
-						}
-					}}
-				/>
-			),
-			{
-				position: "top-center",
-				autoClose: false, 
-				closeOnClick: false,
-				draggable: false,
-			}
-		);
-	};
-
-	// --- SEARCH FUNCTIONALITY ---
+	// 2. Filter Logic (Search by Name or Category)
 	const filteredProducts = products.filter(
 		(product) =>
-			product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			product.category.toLowerCase().includes(searchTerm.toLowerCase())
+			product.name.toLowerCase().includes(search.toLowerCase()) ||
+			product.category.toLowerCase().includes(search.toLowerCase())
 	);
 
-	// --- STOCK BADGE COMPONENT ---
-	const StockBadge = ({ qty }) => {
-		if (qty === 0)
-			return (
-				<span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
-					Out of Stock
-				</span>
-			);
-		if (qty < 5)
-			return (
-				<span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700 border border-orange-200">
-					Low Stock
-				</span>
-			);
-		return (
-			<span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-				In Stock
-			</span>
-		);
+	const confirmDelete = (id) => {
+		Swal.fire({
+			title: "Delete this product?",
+			text: "You won't be able to revert this!",
+			icon: "warning",
+			showCancelButton: true,
+			confirmButtonColor: "#d33",
+			cancelButtonColor: "#3085d6",
+			confirmButtonText: "Yes, delete it!",
+			background: "#1e293b",
+			color: "#fff",
+		}).then(async (result) => {
+			if (result.isConfirmed) {
+				await deleteProduct(id);
+			}
+		});
+	};
+
+	const deleteProduct = async (id) => {
+		try {
+			await axios.delete(`/api/products/${id}`);
+			Swal.fire({
+				title: "Deleted!",
+				text: "Product has been deleted.",
+				icon: "success",
+				background: "#1e293b",
+				color: "#fff",
+				confirmButtonColor: "#3085d6",
+			});
+			getProducts();
+		} catch (error) {
+			toast.error(error.message);
+		}
 	};
 
 	return (
-		<div className="max-w-7xl mx-auto">
-			{/* --- HEADER & ACTIONS --- */}
-			<div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
-				<div>
-					<h2 className="text-3xl font-extrabold text-slate-800">
-						Inventory
-					</h2>
-					<p className="text-slate-500 mt-1 text-sm">
-						Manage, track, and organize your assets.
+		<div className="text-white">
+			{/* --- HEADER & SEARCH --- */}
+			<div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+				<h2 className="text-3xl font-bold">Inventory Items</h2>
+				<Link to="/add-product">
+					<button className="bg-brand-600 hover:bg-brand-700 text-white py-2 px-4 rounded-lg flex items-center gap-2 transition shadow-lg shadow-brand-500/30">
+						<FaPlus /> Add New
+					</button>
+				</Link>
+			</div>
+
+			{/* Search Bar Container */}
+			<div className="mb-6 relative max-w-md">
+				<FaSearch className="absolute left-3 top-3 text-gray-400" />
+				<input
+					type="text"
+					placeholder="Search by name or category..."
+					value={search}
+					onChange={(e) => setSearch(e.target.value)}
+					className="w-full bg-slate-800 text-white pl-10 pr-4 py-2 rounded-lg border border-slate-600 focus:border-brand-500 focus:outline-none transition shadow-sm"
+				/>
+			</div>
+
+			{/* --- LOADING STATE --- */}
+			{isLoading && (
+				<div className="flex justify-center items-center h-64">
+					<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-500"></div>
+				</div>
+			)}
+
+			{/* --- EMPTY STATE (Totally Empty) --- */}
+			{!isLoading && products.length === 0 && (
+				<motion.div
+					initial={{ opacity: 0, scale: 0.9 }}
+					animate={{ opacity: 1, scale: 1 }}
+					className="glass p-10 text-center flex flex-col items-center justify-center min-h-[300px]"
+				>
+					<div className="text-6xl mb-4">📦</div>
+					<h3 className="text-2xl font-bold mb-2">
+						Your inventory is empty
+					</h3>
+					<p className="text-gray-300 mb-6">
+						Start tracking your items by adding your first product.
 					</p>
-				</div>
-				<div className="flex gap-3">
-					{/* Removed Export Button */}
-					<Link
-						to="/add-product"
-						className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition shadow-md"
-					>
-						<FaPlus /> Add Item
+					<Link to="/add-product">
+						<button className="bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 px-6 rounded-full transition shadow-lg">
+							Create Product
+						</button>
 					</Link>
-				</div>
-			</div>
+				</motion.div>
+			)}
 
-			{/* --- TOOLBAR (Search & Filter) --- */}
-			<div className="bg-white p-4 rounded-t-xl border-b border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
-				{/* Search Input */}
-				<div className="relative w-full md:w-96">
-					<FaSearch className="absolute left-3 top-3 text-slate-400" />
-					<input
-						type="text"
-						placeholder="Search by name, SKU, or category..."
-						className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-						value={searchTerm}
-						onChange={(e) => setSearchTerm(e.target.value)}
-					/>
-				</div>
-
-				{/* Filter Mockup (Visual Only) */}
-				{/* <div className="flex gap-2 w-full md:w-auto">
-					<button className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition">
-						<FaFilter /> Filter
-					</button>
-					<button className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition">
-						<FaSort /> Sort
-					</button>
-				</div> */}
-			</div>
-
-			{/* --- ENTERPRISE DATA TABLE --- */}
-			<div className="bg-white rounded-b-xl shadow-lg border border-slate-200 overflow-hidden">
-				{isLoading ? (
-					<div className="p-12 text-center text-slate-400 animate-pulse">
-						Loading inventory data...
-					</div>
-				) : filteredProducts.length === 0 ? (
-					<div className="p-12 text-center text-slate-500">
-						<p>No products found matching "{searchTerm}"</p>
-					</div>
-				) : (
-					<div className="overflow-x-auto">
-						<table className="w-full text-left border-collapse">
-							<thead className="bg-slate-50 text-slate-500 uppercase text-xs font-bold tracking-wider">
-								<tr>
-									<th className="px-6 py-4 border-b border-slate-200">
-										Product Name
-									</th>
-									<th className="px-6 py-4 border-b border-slate-200">
-										SKU
-									</th>
-									<th className="px-6 py-4 border-b border-slate-200">
-										Category
-									</th>
-									<th className="px-6 py-4 border-b border-slate-200">
-										Price
-									</th>
-									<th className="px-6 py-4 border-b border-slate-200">
-										Quantity
-									</th>
-									<th className="px-6 py-4 border-b border-slate-200">
-										Value
-									</th>
-									<th className="px-6 py-4 border-b border-slate-200 text-right">
-										Actions
-									</th>
-								</tr>
-							</thead>
-							<tbody className="divide-y divide-slate-100 text-sm">
-								{filteredProducts.map((item) => (
-									<tr
-										key={item._id}
-										className="hover:bg-blue-50/50 transition-colors duration-200"
-									>
-										<td className="px-6 py-4 font-semibold text-slate-800">
-											{item.name}
-										</td>
-										<td className="px-6 py-4 font-mono text-slate-500 text-xs">
-											{item.sku}
-										</td>
-										<td className="px-6 py-4">
-											<span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">
-												{item.category}
-											</span>
-										</td>
-										<td className="px-6 py-4 font-medium text-slate-700">
-											{formatCurrency(item.price)}
-										</td>
-										<td className="px-6 py-4">
-											<StockBadge
-												qty={Number(item.quantity)}
-											/>
-											<span className="ml-2 text-xs text-slate-400">
-												({item.quantity})
-											</span>
-										</td>
-										<td className="px-6 py-4 font-bold text-slate-700">
-											{formatCurrency(
-												item.price * item.quantity
-											)}
-										</td>
-										<td className="px-6 py-4 text-right">
-											<div className="flex justify-end gap-3">
-												<Link
-													to={`/edit-product/${item._id}`}
-													className="text-blue-500 hover:text-blue-700 transition"
-												>
-													<FaEdit size={18} />
-												</Link>
-												<button
-													onClick={() =>
-														handleDelete(item._id)
-													}
-													className="text-red-400 hover:text-red-600 transition"
-												>
-													<FaTrashAlt size={18} />
-												</button>
-											</div>
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
+			{/* --- NO SEARCH RESULTS STATE --- */}
+			{!isLoading &&
+				products.length > 0 &&
+				filteredProducts.length === 0 && (
+					<div className="glass p-8 text-center">
+						<p className="text-gray-400 text-lg">
+							No products found matching "{search}"
+						</p>
 					</div>
 				)}
 
-				{/* --- PAGINATION FOOTER (Visual Only) --- */}
-				<div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
-					<span className="text-sm text-slate-500">
-						Showing{" "}
-						<span className="font-bold text-slate-800">
-							{filteredProducts.length}
-						</span>{" "}
-						results
-					</span>
-					<div className="flex gap-2">
-						<button
-							className="px-3 py-1 border border-slate-300 rounded-md text-sm text-slate-500 bg-white hover:bg-slate-50 disabled:opacity-50"
-							disabled
-						>
-							Previous
-						</button>
-						<button
-							className="px-3 py-1 border border-slate-300 rounded-md text-sm text-slate-500 bg-white hover:bg-slate-50 disabled:opacity-50"
-							disabled
-						>
-							Next
-						</button>
+			{/* --- PRODUCT TABLE --- */}
+			{!isLoading && filteredProducts.length > 0 && (
+				<motion.div
+					initial={{ opacity: 0, y: 20 }}
+					animate={{ opacity: 1, y: 0 }}
+					className="glass overflow-hidden rounded-xl"
+				>
+					<div className="overflow-x-auto">
+						<table className="w-full text-left border-collapse min-w-[600px]">
+							<thead>
+								<tr className="bg-brand-600/20 text-brand-100 uppercase text-sm leading-normal">
+									<th className="py-4 px-6">S/N</th>
+									<th className="py-4 px-6">Name</th>
+									<th className="py-4 px-6">Category</th>
+									<th className="py-4 px-6">Price</th>
+									<th className="py-4 px-6">Quantity</th>
+									<th className="py-4 px-6">Value</th>
+									<th className="py-4 px-6 text-center">
+										Action
+									</th>
+								</tr>
+							</thead>
+							<tbody className="text-gray-200 text-sm font-light">
+								{filteredProducts.map((product, index) => {
+									// Using filteredProducts here
+									const {
+										_id,
+										name,
+										category,
+										price,
+										quantity,
+									} = product;
+									return (
+										<tr
+											key={_id}
+											className="border-b border-gray-700 hover:bg-white/5 transition duration-150"
+										>
+											<td className="py-4 px-6 whitespace-nowrap font-medium">
+												{index + 1}
+											</td>
+											<td className="py-4 px-6 font-bold text-white truncate max-w-[150px]">
+												{name}
+											</td>
+											<td className="py-4 px-6">
+												{category}
+											</td>
+											<td className="py-4 px-6 text-green-400 font-mono">
+												{"$"}
+												{price}
+											</td>
+											<td className="py-4 px-6">
+												<span
+													className={`py-1 px-3 rounded-full text-xs font-bold ${
+														quantity > 0
+															? "bg-green-500/20 text-green-300"
+															: "bg-red-500/20 text-red-300"
+													}`}
+												>
+													{quantity}
+												</span>
+											</td>
+											<td className="py-4 px-6 font-mono">
+												{"$"}
+												{price * quantity}
+											</td>
+											<td className="py-4 px-6 text-center">
+												<div className="flex item-center justify-center gap-4">
+													<Link
+														to={`/product-detail/${_id}`}
+													>
+														<FaEye className="w-5 h-5 text-purple-400 hover:text-purple-300 transform hover:scale-110 transition" />
+													</Link>
+													<Link
+														to={`/edit-product/${_id}`}
+													>
+														<FaEdit className="w-5 h-5 text-blue-400 hover:text-blue-300 transform hover:scale-110 transition" />
+													</Link>
+													<button
+														onClick={() =>
+															confirmDelete(_id)
+														}
+													>
+														<FaTrashAlt className="w-5 h-5 text-red-400 hover:text-red-300 transform hover:scale-110 transition" />
+													</button>
+												</div>
+											</td>
+										</tr>
+									);
+								})}
+							</tbody>
+						</table>
 					</div>
-				</div>
-			</div>
+				</motion.div>
+			)}
 		</div>
 	);
 };

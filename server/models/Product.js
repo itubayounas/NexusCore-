@@ -2,37 +2,48 @@ import mongoose from "mongoose";
 
 const productSchema = mongoose.Schema(
 	{
+		// --- ADD THIS NEW FIELD ---
+		user: {
+			type: mongoose.Schema.Types.ObjectId, // It stores a User ID
+			required: true,
+			ref: "User", // It references the 'User' collection
+		},
+		// --------------------------
 		name: {
 			type: String,
-			required: [true, "Please add a product name"],
+			required: [true, "Please add a name"],
 			trim: true,
 		},
 		sku: {
 			type: String,
 			required: true,
-			unique: true, // No two products can have the same Barcode/SKU
+			default: "SKU",
 			trim: true,
 		},
 		category: {
 			type: String,
-			required: true,
-			default: "General",
+			required: [true, "Please add a category"],
+			trim: true,
 		},
 		quantity: {
-			type: Number,
-			required: true,
-			default: 0,
+			type: String,
+			required: [true, "Please add a quantity"],
+			trim: true,
 		},
 		price: {
-			type: Number,
-			required: true,
-			default: 0.0,
+			type: String,
+			required: [true, "Please add a price"],
+			trim: true,
 		},
 		description: {
 			type: String,
-			required: false,
+			required: [true, "Please add a description"],
+			trim: true,
 		},
-		// This adds a timestamp for when the product was created and last updated
+		image: {
+			type: Object,
+			default: {},
+		},
 	},
 	{
 		timestamps: true,
@@ -40,5 +51,4 @@ const productSchema = mongoose.Schema(
 );
 
 const Product = mongoose.model("Product", productSchema);
-
 export default Product;
