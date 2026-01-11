@@ -12,13 +12,23 @@ import errorHandler from "./middleware/errorMiddleware.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// dotenv.config();
+
 const app = express();
 app.use(cookieParser());
 
 // --- MIDDLEWARE ---
 app.use(express.json());
-app.use(cors());
+
+// UPDATED CORS CONFIGURATION
+app.use(
+	cors({
+		origin: [
+			"http://localhost:5173", // Local Development
+			"https://nexus-core-frontened.vercel.app", // Your Vercel Frontend
+		],
+		credentials: true, // Important for cookies/sessions to work
+	})
+);
 
 // --- DATABASE ---
 const connectDB = async () => {
