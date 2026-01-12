@@ -9,7 +9,7 @@ const userSchema = mongoose.Schema(
 		},
 		email: {
 			type: String,
-			required: [true, "Please add a email"],
+			required: [true, "Please add an email"],
 			unique: true,
 			trim: true,
 			match: [
@@ -22,11 +22,6 @@ const userSchema = mongoose.Schema(
 			required: [true, "Please add a password"],
 			minLength: [6, "Password must be up to 6 characters"],
 		},
-		photo: {
-			type: String,
-			required: [true, "Please add a photo"],
-			default: "https://i.ibb.co/4pDNDk1/avatar.png",
-		},
 		bio: {
 			type: String,
 			maxLength: [250, "Bio must not be more than 250 characters"],
@@ -38,17 +33,12 @@ const userSchema = mongoose.Schema(
 	}
 );
 
-// --- ENCRYPTION MIDDLEWARE ---
-// Note: We MUST use a regular function here (not an arrow function)
-// so that 'this' refers to the document being saved.
+// --- ENCRYPT PASSWORD BEFORE SAVE ---
 userSchema.pre("save", async function (next) {
-	if (!this.isModified("password")) {
-		return next();
-	}
+	if (!this.isModified("password")) return next();
 
 	const salt = await bcrypt.genSalt(10);
-	const hashedPassword = await bcrypt.hash(this.password, salt);
-	this.password = hashedPassword;
+	this.password = await bcrypt.hash(this.password, salt);
 	next();
 });
 
