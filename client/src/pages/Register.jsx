@@ -13,22 +13,11 @@ const Register = () => {
 		confirmPassword: "",
 	});
 
-	// State for the image file
-	const [photo, setPhoto] = useState(null);
-	const [photoPreview, setPhotoPreview] = useState(null);
-
 	const { name, email, password, confirmPassword } = formData;
 
 	const handleInputChange = (e) => {
 		const { name, value } = e.target;
 		setFormData({ ...formData, [name]: value });
-	};
-
-	const handleImageChange = (e) => {
-		const file = e.target.files[0];
-		setPhoto(file);
-		// Create a preview URL so the user can see what they selected
-		setPhotoPreview(URL.createObjectURL(file));
 	};
 
 	const registerUser = async (e) => {
@@ -45,16 +34,12 @@ const Register = () => {
 			return toast.error("Passwords do not match");
 		}
 
-		// 2. Prepare Data (Must use FormData for file uploads)
-		const userData = new FormData();
-		userData.append("name", name);
-		userData.append("email", email);
-		userData.append("password", password);
-		if (photo) {
-			userData.append("photo", photo);
-		}
-
-		// ... inside registerUser function ...
+		// 2. Prepare Data (Sending simple JSON now, not FormData)
+		const userData = {
+			name,
+			email,
+			password,
+		};
 
 		try {
 			const { data } = await axios.post("/api/users/register", userData);
@@ -74,17 +59,14 @@ const Register = () => {
 
 			// 2. Smart Check: Is the user already registered?
 			if (message.toLowerCase().includes("already been registered")) {
-				// Show specific advice
 				toast.info("User already registered. Redirecting to login...", {
 					autoClose: 2000,
 				});
 
-				// Auto-redirect to Login page after 2 seconds
 				setTimeout(() => {
 					navigate("/login");
 				}, 2500);
 			} else {
-				// Show generic error for other issues
 				toast.error(message);
 			}
 		}
@@ -159,39 +141,6 @@ const Register = () => {
 								className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
 								placeholder="Confirm Password"
 							/>
-						</div>
-
-						{/* Image Upload Section */}
-						<div className="flex items-center space-x-4 mt-4">
-							<div className="shrink-0">
-								{photoPreview ? (
-									<img
-										className="h-16 w-16 object-cover rounded-full"
-										src={photoPreview}
-										alt="Current profile"
-									/>
-								) : (
-									<div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-2xl">
-										📷
-									</div>
-								)}
-							</div>
-							<label className="block">
-								<span className="sr-only">
-									Choose profile photo
-								</span>
-								<input
-									type="file"
-									onChange={handleImageChange}
-									className="block w-full text-sm text-slate-500
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-full file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-blue-50 file:text-blue-700
-                        hover:file:bg-blue-100
-                        "
-								/>
-							</label>
 						</div>
 					</div>
 
