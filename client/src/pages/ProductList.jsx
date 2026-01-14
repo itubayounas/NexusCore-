@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useRedirectLoggedOutUser } from "../hook/useRedirectLoggedOutUser";
 import axios from "axios";
-import { FaEdit, FaTrashAlt, FaEye, FaPlus, FaSearch } from "react-icons/fa";
+import {
+	FaEdit,
+	FaTrashAlt,
+	FaEye,
+	FaPlus,
+	FaSearch,
+	FaMinusCircle,
+} from "react-icons/fa"; // Added FaMinusCircle
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { motion } from "framer-motion";
@@ -12,7 +19,7 @@ const ProductList = () => {
 
 	const [products, setProducts] = useState([]);
 	const [isLoading, setIsLoading] = useState(false);
-	const [search, setSearch] = useState(""); // 1. Search State
+	const [search, setSearch] = useState("");
 
 	const getProducts = async () => {
 		setIsLoading(true);
@@ -30,7 +37,41 @@ const ProductList = () => {
 		getProducts();
 	}, []);
 
-	// 2. Filter Logic (Search by Name or Category)
+	// --- NEW FUNCTION: Decrease Quantity ---
+	const decreaseQuantity = async (product) => {
+		if (product.quantity <= 0) {
+			return toast.error("Stock cannot be less than 0");
+		}
+
+		try {
+			// Optimistic UI Update (Make it feel instant)
+			// We update the local state first before the server responds
+			const updatedProducts = products.map((p) =>
+				p._id === product._id ? { ...p, quantity: p.quantity - 1 } : p
+			);
+			setProducts(updatedProducts);
+
+			// Send request to Backend
+			await axios.patch(`/api/products/${product._id}`, {
+				name: product.name,
+				category: product.category,
+				price: product.price,
+				description: product.description,
+				image: product.image,
+				quantity: product.quantity - 1,
+			});
+
+			// Optional: You can fetch products again to ensure sync,
+			// but for speed, we skip it since we updated local state above.
+			// getProducts();
+		} catch (error) {
+			// Revert changes if server fails
+			getProducts();
+			toast.error("Failed to update stock");
+			console.error(error);
+		}
+	};
+
 	const filteredProducts = products.filter(
 		(product) =>
 			product.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -160,7 +201,6 @@ const ProductList = () => {
 							</thead>
 							<tbody className="text-gray-200 text-sm font-light">
 								{filteredProducts.map((product, index) => {
-									// Using filteredProducts here
 									const {
 										_id,
 										name,
@@ -186,17 +226,33 @@ const ProductList = () => {
 												{"$"}
 												{price}
 											</td>
+
+											{/* --- UPDATED QUANTITY COLUMN --- */}
 											<td className="py-4 px-6">
-												<span
-													className={`py-1 px-3 rounded-full text-xs font-bold ${
-														quantity > 0
-															? "bg-green-500/20 text-green-300"
-															: "bg-red-500/20 text-red-300"
-													}`}
-												>
-													{quantity}
-												</span>
+												<div className="flex items-center gap-2">
+													<span
+														className={`py-1 px-3 rounded-full text-xs font-bold ${
+															quantity > 0
+																? "bg-green-500/20 text-green-300"
+																: "bg-red-500/20 text-red-300"
+														}`}
+													>
+														{quantity}
+													</span>
+
+													{/* Minus Button */}
+													<FaMinusCircle
+														title="Decrease Stock"
+														className="w-5 h-5 text-red-500 hover:text-red-400 cursor-pointer transform hover:scale-110 transition"
+														onClick={() =>
+															decreaseQuantity(
+																product
+															)
+														}
+													/>
+												</div>
 											</td>
+
 											<td className="py-4 px-6 font-mono">
 												{"$"}
 												{price * quantity}

@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom"; // Added Link import
+import { useParams, Link } from "react-router-dom";
 import { useRedirectLoggedOutUser } from "../hook/useRedirectLoggedOutUser";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { FaSpinner, FaEdit, FaArrowLeft, FaCalendarAlt } from "react-icons/fa";
-
+import { toast } from "react-toastify"; // 1. Added toast
+import {
+	FaSpinner,
+	FaEdit,
+	FaArrowLeft,
+	FaCalendarAlt,
+	FaMinusCircle,
+} from "react-icons/fa"; // 2. Added FaMinusCircle
 
 const ProductDetail = () => {
 	useRedirectLoggedOutUser("/login");
@@ -22,10 +28,39 @@ const ProductDetail = () => {
 			} catch (error) {
 				setIsLoading(false);
 				console.log(error);
+				toast.error("Could not fetch product");
 			}
 		};
 		getProduct();
 	}, [id]);
+
+	// --- 3. New Function: Decrease Quantity ---
+	const decreaseQuantity = async () => {
+		// Prevent action if already 0
+		if (product.quantity <= 0) return;
+
+		try {
+			const newQuantity = product.quantity - 1;
+
+			// Optimistic Update (Update UI immediately)
+			setProduct({ ...product, quantity: newQuantity });
+
+			// Send to Backend
+			await axios.patch(`/api/products/${product._id}`, {
+				name: product.name,
+				category: product.category,
+				price: product.price,
+				description: product.description,
+				image: product.image,
+				quantity: newQuantity,
+			});
+		} catch (error) {
+			toast.error("Failed to update stock");
+			// Re-fetch data if it failed to ensure sync
+			const { data } = await axios.get(`/api/products/${id}`);
+			setProduct(data);
+		}
+	};
 
 	const stockStatus = (quantity) => {
 		if (quantity > 0) {
@@ -78,8 +113,9 @@ const ProductDetail = () => {
 						</Link>
 					</div>
 
-					{/* --- Stats Grid (Replaces Image) --- */}
+					{/* --- Stats Grid --- */}
 					<div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+						{/* Price Card */}
 						<div className="bg-slate-800/40 p-5 rounded-xl border border-slate-700/50">
 							<p className="text-gray-400 text-xs uppercase tracking-wider mb-1">
 								Price
@@ -88,14 +124,37 @@ const ProductDetail = () => {
 								${product.price}
 							</p>
 						</div>
-						<div className="bg-slate-800/40 p-5 rounded-xl border border-slate-700/50">
+
+						{/* --- 4. Updated Quantity Card (With Button) --- */}
+						<div className="bg-slate-800/40 p-5 rounded-xl border border-slate-700/50 flex flex-col justify-between">
 							<p className="text-gray-400 text-xs uppercase tracking-wider mb-1">
 								Quantity
 							</p>
-							<p className="text-3xl font-bold text-blue-400">
-								{product.quantity}
-							</p>
+
+							<div className="flex items-center gap-4">
+								{/* Minus Button */}
+								<button
+									onClick={decreaseQuantity}
+									disabled={product.quantity === 0} // Disable if 0
+									className={`transition transform ${
+										product.quantity === 0
+											? "opacity-30 cursor-not-allowed text-gray-500" // Disabled Style
+											: "text-red-500 hover:text-red-400 hover:scale-110 active:scale-90 cursor-pointer" // Active Style
+									}`}
+								>
+									<FaMinusCircle
+										size={24}
+										title="Decrease Stock"
+									/>
+								</button>
+
+								<p className="text-3xl font-bold text-blue-400">
+									{product.quantity}
+								</p>
+							</div>
 						</div>
+
+						{/* Value Card */}
 						<div className="bg-slate-800/40 p-5 rounded-xl border border-slate-700/50">
 							<p className="text-gray-400 text-xs uppercase tracking-wider mb-1">
 								Total Value
@@ -126,7 +185,7 @@ const ProductDetail = () => {
 							</p>
 						</div>
 
-						{/* Dates (Optional, if your DB has createdAt) */}
+						{/* Dates */}
 						<div className="flex gap-4 text-xs text-gray-500 pt-2">
 							<div className="flex items-center gap-2">
 								<FaCalendarAlt />
