@@ -10,12 +10,14 @@ import Dashboard from "./pages/Dashboard";
 import ProductList from "./pages/ProductList";
 import AddProduct from "./pages/AddProduct";
 import EditProduct from "./pages/EditProduct";
-import ProductDetail from "./pages/ProductDetails"; // <--- 1. NEW IMPORT
+import ProductDetail from "./pages/ProductDetails";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
 // Components
 import Sidebar from "./components/Sidebar";
+// 1. IMPORT THE VOICE ASSISTANT
+import VoiceAssistant from "./components/VoiceAssistant";
 
 const Layout = ({ children }) => {
 	const location = useLocation();
@@ -38,7 +40,7 @@ const Layout = ({ children }) => {
 
 			{/* Main Content Area */}
 			<div className="flex-1 flex flex-col h-full overflow-hidden relative">
-				{/* --- MOBILE HEADER (Visible only on small screens) --- */}
+				{/* --- MOBILE HEADER --- */}
 				<div className="md:hidden flex items-center justify-between bg-slate-900 p-4 border-b border-slate-700 text-white">
 					<div className="flex items-center gap-2">
 						<span className="text-2xl">📦</span>
@@ -56,6 +58,15 @@ const Layout = ({ children }) => {
 				<div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
 					{children}
 				</div>
+
+				{/* 2. GLOBAL VOICE ASSISTANT 
+                    Only show this on private pages (Dashboard, Inventory, etc.)
+                */}
+				{!isPublic && (
+					<VoiceAssistant
+						onOperationSuccess={() => window.location.reload()}
+					/>
+				)}
 			</div>
 		</div>
 	);
@@ -76,8 +87,6 @@ function App() {
 					<Route path="/add-product" element={<AddProduct />} />
 					<Route path="/inventory" element={<ProductList />} />
 					<Route path="/edit-product/:id" element={<EditProduct />} />
-
-					{/* <--- 2. NEW ROUTE FOR THE EYE BUTTON */}
 					<Route
 						path="/product-detail/:id"
 						element={<ProductDetail />}
