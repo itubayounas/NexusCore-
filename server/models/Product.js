@@ -40,17 +40,10 @@ const productSchema = mongoose.Schema(
 			required: [true, "Please add a description"],
 			trim: true,
 		},
-<<<<<<< HEAD
 		image: {
 			type: Object,
 			default: {},
 		},
-=======
-		// image: {
-		// 	type: Object,
-		// 	default: {},
-		// },
->>>>>>> 8805885 (fixed the database connection error)
 	},
 	{
 		timestamps: true,
