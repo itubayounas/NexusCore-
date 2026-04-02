@@ -17,11 +17,7 @@ import Register from "./pages/Register";
 // Components
 import Sidebar from "./components/Sidebar";
 // 1. IMPORT THE VOICE ASSISTANT
-<<<<<<< HEAD
-import VoiceAssistant from "./components/VoiceAssistant";				
-=======
-//import VoiceAssistant from "./components/VoiceAssistant";
->>>>>>> 8805885 (fixed the database connection error)
+// import VoiceAssistant from "./components/VoiceAssistant";
 
 const Layout = ({ children }) => {
 	const location = useLocation();
@@ -66,19 +62,11 @@ const Layout = ({ children }) => {
 				{/* 2. GLOBAL VOICE ASSISTANT 
                     Only show this on private pages (Dashboard, Inventory, etc.)
                 */}
-<<<<<<< HEAD
-				{!isPublic && (
-					<VoiceAssistant
-						onOperationSuccess={() => window.location.reload()}
-					/>
-				)}
-=======
 				{/* {!isPublic && (
 					<VoiceAssistant
 						onOperationSuccess={() => window.location.reload()}
 					/>
 				)} */}
->>>>>>> 8805885 (fixed the database connection error)
 			</div>
 		</div>
 	);
