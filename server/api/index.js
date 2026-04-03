@@ -21,13 +21,13 @@ app.use(express.urlencoded({ extended: false }));
 app.use(
 	cors({
 		origin: [
-			"http://localhost:5173", // Localhost
+			"http://localhost:3000", // Localhost
 			"https://nexus-core-frontened.vercel.app", // Live Frontend
 		],
 		credentials: true,
 		methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 		allowedHeaders: ["Content-Type", "Authorization"],
-	})
+	}),
 );
 
 // --- ROBUST DATABASE CONNECTION ---
